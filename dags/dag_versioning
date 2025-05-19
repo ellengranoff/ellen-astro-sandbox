@@ -4,8 +4,8 @@ from pendulum import datetime
 @dag(schedule="@daily", start_date=datetime(2025, 1, 1), tags=["dag_versioning"])
 def af3_dag_versioning_example():
 
-    # V1 of this dag runs the first three tasks
-    
+    # V1 of this dag runs the first 3 tasks
+
     @task
     def task_1():
         print("Hello from task 1!")
@@ -20,7 +20,7 @@ def af3_dag_versioning_example():
 
     @task
     def task_4():
-        print("Hello from task 3!")
+        print("Hello from task 4!")
 
     chain(
         task_1(),
