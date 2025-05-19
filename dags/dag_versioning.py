@@ -26,7 +26,7 @@ def af3_dag_versioning_example():
         task_1(),
         task_2(),
         task_3(),
-        # task_4(),
+        task_4(),
     )
 
 af3_dag_versioning_example()
