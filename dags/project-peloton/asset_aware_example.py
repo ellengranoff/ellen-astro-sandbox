@@ -15,7 +15,7 @@ with DAG(
     tags=["peloton"]
 ) as dag:
     
-    # Get the connection securely at DAG parse time + construct auth payload
+    # Get the connection securely + construct auth payload
     def get_login_payload():
         conn = BaseHook.get_connection("ellen_peloton_connection_new")
         return {
@@ -25,7 +25,7 @@ with DAG(
     
     auth_payload = get_login_payload()
 
-    # Authenticate with Peloton
+    # Authenticate with Peloton using auth_payload
     login_task = HttpOperator(
         task_id="login_task",
         http_conn_id="ellen_peloton_connection_new",
@@ -50,6 +50,7 @@ with DAG(
         resp = requests.get("https://api.onepeloton.com/api/me", headers=headers)
         resp.raise_for_status()
         profile_data = resp.json()
+        # print(profile_data)
         return profile_data
 
     # get user data
@@ -58,8 +59,48 @@ with DAG(
         python_callable=get_profile
     )
 
+    def get_workout_ids(**context):
+        session_id = context["ti"].xcom_pull(task_ids="login_task")
+        if not session_id:
+            raise ValueError("No session_id found in XCom.")
+        headers = {
+            "Content-Type": "application/json",
+            "Cookie": f"peloton_session_id={session_id}"
+        }
+        profile_data = context["ti"].xcom_pull(task_ids="get_peloton_profile")
+        user_id = profile_data["id"]
+
+        if not user_id:
+            raise ValueError("No session_id found in XCom.")
+        limit = 100
+        page = 0
+        all_workout_ids = []
+        while True:
+            print("page: ", page)
+            resp = requests.get(f"https://api.onepeloton.com/api/user/{user_id}/workouts?limit={limit}&page={page}", headers=headers)
+            resp.raise_for_status()
+            workouts= resp.json()
+            
+            workout_ids = []
+            for workout in workouts["data"]:
+                workout_id = workout["id"]
+                if workout_id:
+                    workout_ids.append(workout_id)
+            all_workout_ids.extend(workout_ids)
+            if len(workouts) < limit:
+                break
+            page += 1
+        print("len(all_workout_ids)", len(all_workout_ids))
+        return all_workout_ids
+        
+    
+    # get user data
+    workout_ids_task = PythonOperator(
+        task_id="get_workouts",
+        python_callable=get_workout_ids
+    )
 
 
-    login_task >> profile_task
+    login_task >> profile_task >> workout_ids_task
 
 
